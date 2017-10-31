@@ -104,8 +104,9 @@ public class BitReader
         if ( numWords > 0 )
         {
 			Assert.IsTrue( ( m_bitsRead % 32 ) == 0 );
-			Array.Copy(m_data, m_wordIndex, data, headBytes, numWords * 4);
-           // memcpy( data + headBytes, &m_data[m_wordIndex], numWords * 4 );
+			UInt32[] arrData = new uint[numWords];
+			Array.Copy(m_data, m_wordIndex, arrData, 0, numWords);//TODO:
+			Array.Copy(NetworkUtil.UIntArrayToByteArray(arrData), 0, data, headBytes, numWords * 4);
             m_bitsRead += numWords * 32;
             m_wordIndex += numWords;
             m_scratchBits = 0;

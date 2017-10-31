@@ -68,12 +68,20 @@ public class BitWriter
 
 		int headBytes = ( 4 - ( m_bitsWritten % 32 ) / 8 ) % 4;
 		if ( headBytes > bytes )
+		{
 			headBytes = bytes;
-		for ( int i = 0; i < headBytes; ++i )
-			WriteBits( data[i], 8 );
-		if ( headBytes == bytes )
-			return;
+		}
 
+		for ( int i = 0; i < headBytes; ++i )
+		{
+			WriteBits( data[i], 8 );
+		}
+
+		if ( headBytes == bytes )
+		{
+			return;
+		}
+			
 		FlushBits();
 
 		Assert.IsTrue( GetAlignBits() == 0 );
@@ -82,8 +90,10 @@ public class BitWriter
 		if ( numWords > 0 )
 		{
 			Assert.IsTrue( ( m_bitsWritten % 32 ) == 0 );
-			Array.Copy(data, headBytes, m_data, m_wordIndex, numWords * 4);
-			//memcpy( &m_data[m_wordIndex], data + headBytes, numWords * 4 );
+			int len = numWords * 4;
+			byte[] arrData = new byte[len];
+			Array.Copy(data, headBytes, arrData, 0 , len);//TODO:
+			Array.Copy(NetworkUtil.ByteArrayToUIntArray(arrData), 0, m_data, m_wordIndex, numWords);
 			m_bitsWritten += numWords * 32;
 			m_wordIndex += numWords;
 			m_scratch = 0;
@@ -95,7 +105,9 @@ public class BitWriter
 		int tailBytes = bytes - tailStart;
 		Assert.IsTrue( tailBytes >= 0 && tailBytes < 4 );
 		for ( int i = 0; i < tailBytes; ++i )
+		{
 			WriteBits( data[tailStart+i], 8 );
+		}
 
 		Assert.IsTrue( GetAlignBits() == 0 );
 

@@ -174,10 +174,8 @@ public class TestUDP : MonoBehaviour {
 
 		WriteStream writeSteam = new WriteStream(buffer, BufferSize);
 		TestObject obj = new TestObject();
-		obj.data.a = -9;
-		obj.data.b = -999;
-		obj.data.c = 3;
-		obj.data.d = 6;
+		obj.Init();
+
 		Debug.Log("----write object: " + obj.ToString());
 		obj.SerializeWrite(writeSteam);
 		writeSteam.Flush();
@@ -204,27 +202,59 @@ public class TestObject : NObject
 	private TestData m_data = new TestData();
 	public TestData data{get{return m_data;}}
 
+	public void Init()
+	{
+		m_data.intA = -9;
+		m_data.intB = -999;
+		m_data.byteC = 3;
+		m_data.shortD = 6;
+		m_data.boolE = false;
+		m_data.floatF = 3.1415926f;
+		m_data.uint64G = UInt64.MaxValue;
+		m_data.doubleH = double.MinValue;
+		for(int i = 0; i < m_data.bytesI.Length; ++i)
+		{
+			m_data.bytesI[i] = (byte)UnityEngine.Random.Range(0, 255);
+		}
+	}
+
 	public override bool SerializeWrite (WriteStream stream)
 	{
-		this.SerializeInt(stream, m_data.a, -100, 100);
-		this.SerializeInt(stream, m_data.b, -1000, 1000);
-		this.SerializeBits(stream, m_data.c, 4);
-		this.SerializeBits(stream, m_data.d, 8);
+		this.SerializeInt(stream, m_data.intA, -100, 100);
+		this.SerializeInt(stream, m_data.intB, -1000, 1000);
+		this.SerializeBits(stream, m_data.byteC, 4);
+		this.SerializeBits(stream, m_data.shortD, 8);
+		this.SerializeAlign(stream);
+		this.SerializeBool(stream, m_data.boolE);
+		this.SerializeFloat(stream, m_data.floatF);
+		this.SerializeUInt64(stream, m_data.uint64G);
+		this.SerializeDouble(stream, m_data.doubleH);
+		this.SerializeBytes(stream, m_data.bytesI, m_data.bytesI.Length);
 		return true;
 	}
 
 	public override bool SerializeRead (ReadStream stream)
 	{
-		m_data.a = this.DeserializeInt(stream, -100, 100);
-		m_data.b = this.DeserializeInt(stream, -1000, 1000);
-		m_data.c = (byte)this.DeserializeBits(stream, 4);
-		m_data.d = (short)this.DeserializeBits(stream, 8);
+		m_data.intA = this.DeserializeInt(stream, -100, 100);
+		m_data.intB = this.DeserializeInt(stream, -1000, 1000);
+		m_data.byteC = (byte)this.DeserializeBits(stream, 4);
+		m_data.shortD = (short)this.DeserializeBits(stream, 8);
+		this.SerializeAlign(stream);
+		m_data.boolE = this.DeserializeBool(stream);
+		m_data.floatF = this.DeserializeFloat(stream);
+		m_data.uint64G = this.DeserializeUInt64(stream);
+		m_data.doubleH = this.DeserializeDouble(stream);
+		this.DeserializeBytes(stream, ref m_data.bytesI, m_data.bytesI.Length);
 		return true;
 	}
 
 	public override string ToString ()
 	{
-		return string.Format ("[TestObject: data.a ={0}, data.b ={1},data.c={2},data.d={3}]", data.a, data.b, data.c, data.d);
+		return string.Format ("[TestObject: data.intA={0}, data.intB={1},data.byteC={2}," +
+			"data.shortD={3}, data.boolE={4}, data.floatF={5}, data.uint64G{6}, data.doubleH{7}" +
+			",data.bytesI={8}]", 
+			data.intA, data.intB, data.byteC, data.shortD, data.boolE,data.floatF,data.uint64G,
+			data.doubleH, data.bytesI);
 	}
 
 	public override bool Equals (object obj)
@@ -240,10 +270,15 @@ public class TestObject : NObject
 
 public class TestData
 {
-	public int a;
-	public int b;
-	public byte c;
-	public short d;
+	public int intA;
+	public int intB;
+	public byte byteC;
+	public short shortD;
+	public bool boolE;
+	public float floatF;
+	public UInt64 uint64G;
+	public double doubleH;
+	public byte[] bytesI = new byte[17];
 
 	public override bool Equals (object obj)
 	{
@@ -251,10 +286,34 @@ public class TestData
 		if(obj is TestData)
 		{
 			TestData target = (TestData)obj;
-			ret = (this.a == target.a
-				&& this.b == target.b
-				&& this.c == target.c
-				&& this.d == target.d);
+
+			bool bytesEq = false;
+
+			if(this.bytesI.Length == target.bytesI.Length)
+			{
+				bytesEq = true;
+			}
+			if(bytesEq)
+			{
+				for(int i = 0 ; i < this.bytesI.Length; ++i)
+				{
+					if(this.bytesI[i] != target.bytesI[i])
+					{
+						bytesEq = false;
+						break;
+					}
+				}
+			}
+
+			ret = (this.intA == target.intA
+				&& this.intB == target.intB
+				&& this.byteC == target.byteC
+				&& this.shortD == target.shortD
+				&& this.boolE == target.boolE
+				&& this.floatF == target.floatF
+				&& this.uint64G == target.uint64G
+				&& this.doubleH == target.doubleH
+				&& bytesEq);
 		}	
 		return ret;
 	}

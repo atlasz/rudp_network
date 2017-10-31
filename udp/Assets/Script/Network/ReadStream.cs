@@ -49,7 +49,7 @@ public class ReadStream:BaseStream
 		return true;
 	}
 
-	public bool SerializeBytes( byte[] data, int bytes )
+	public bool SerializeBytes( ref byte[] data, int bytes )
 	{
 		if ( !SerializeAlign() )
 			return false;

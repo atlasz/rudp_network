@@ -30,7 +30,7 @@ public class NetworkUtil
 	public static UInt32[] ByteArrayToUIntArray(byte[] data)
 	{
 		Assert.IsNotNull(data);
-		Assert.IsTrue(data.Length % 4 == 0);
+		Assert.IsTrue(data.Length % 4 == 0, "data.Length: " + data.Length);
 		int len = data.Length / 4;
 		UInt32[] ret = new UInt32[len];
 		for(int i = 0; i < len; ++i)
