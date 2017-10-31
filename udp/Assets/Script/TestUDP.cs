@@ -62,7 +62,7 @@ public class TestUDP : MonoBehaviour {
 	{
 		//EndianTest();
 		//SignTest();
-		BitPackerTest();
+		//BitPackerTest();
 		TestStream();
 		//EchoTest();
 	}
@@ -216,6 +216,7 @@ public class TestObject : NObject
 		{
 			m_data.bytesI[i] = (byte)UnityEngine.Random.Range(0, 255);
 		}
+		m_data.strJ = "Hello World!";
 	}
 
 	public override bool SerializeWrite (WriteStream stream)
@@ -230,6 +231,7 @@ public class TestObject : NObject
 		this.SerializeUInt64(stream, m_data.uint64G);
 		this.SerializeDouble(stream, m_data.doubleH);
 		this.SerializeBytes(stream, m_data.bytesI, m_data.bytesI.Length);
+		this.SerializeString(stream, m_data.strJ);
 		return true;
 	}
 
@@ -245,6 +247,7 @@ public class TestObject : NObject
 		m_data.uint64G = this.DeserializeUInt64(stream);
 		m_data.doubleH = this.DeserializeDouble(stream);
 		this.DeserializeBytes(stream, ref m_data.bytesI, m_data.bytesI.Length);
+		m_data.strJ = this.DeserializeString(stream);
 		return true;
 	}
 
@@ -252,9 +255,9 @@ public class TestObject : NObject
 	{
 		return string.Format ("[TestObject: data.intA={0}, data.intB={1},data.byteC={2}," +
 			"data.shortD={3}, data.boolE={4}, data.floatF={5}, data.uint64G{6}, data.doubleH{7}" +
-			",data.bytesI={8}]", 
+			",data.bytesI={8}, data.strJ={9}]", 
 			data.intA, data.intB, data.byteC, data.shortD, data.boolE,data.floatF,data.uint64G,
-			data.doubleH, data.bytesI);
+			data.doubleH, data.bytesI, data.strJ);
 	}
 
 	public override bool Equals (object obj)
@@ -279,6 +282,7 @@ public class TestData
 	public UInt64 uint64G;
 	public double doubleH;
 	public byte[] bytesI = new byte[17];
+	public string strJ = "";
 
 	public override bool Equals (object obj)
 	{
@@ -313,7 +317,8 @@ public class TestData
 				&& this.floatF == target.floatF
 				&& this.uint64G == target.uint64G
 				&& this.doubleH == target.doubleH
-				&& bytesEq);
+				&& bytesEq
+				&& this.strJ.Equals(target.strJ));
 		}	
 		return ret;
 	}

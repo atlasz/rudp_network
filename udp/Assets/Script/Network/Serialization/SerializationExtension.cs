@@ -100,26 +100,6 @@ public static class SerializationExtension
 		return value;
 	}
 
-//	template <typename Stream> bool serialize_double_internal( Stream & stream, double & value )
-//	{
-//		union DoubleInt
-//		{
-//			double double_value;
-//			uint64_t int_value;
-//		};
-//
-//		DoubleInt tmp;
-//		if ( Stream::IsWriting )
-//			tmp.double_value = value;
-//
-//		serialize_uint64( stream, tmp.int_value );
-//
-//		if ( Stream::IsReading )
-//			value = tmp.double_value;
-//
-//		return true;
-//	}
-
 	public static bool SerializeDouble(this NObject obj, WriteStream stream, double value)
 	{              
 		ulong val = (ulong)BitConverter.DoubleToInt64Bits(value);
@@ -142,4 +122,24 @@ public static class SerializationExtension
 	{              
 		return stream.SerializeBytes(ref data, bytes);
 	}
+
+	public static bool SerializeString(this NObject obj, WriteStream stream, string data)
+	{             
+		int length = data.Length;
+		SerializeInt(obj, stream, length, 0, int.MaxValue);
+		char[] arr = data.ToCharArray();
+		SerializeBytes(obj, stream, System.Text.Encoding.Default.GetBytes(data.ToCharArray()), length);
+		return true;
+	}
+
+	public static string DeserializeString(this NObject obj, ReadStream stream)
+	{             
+		int length = DeserializeInt(obj, stream, 0, int.MaxValue);
+		byte[] val = new byte[length];
+		DeserializeBytes(obj, stream, ref val, length);
+		//val[length] = Convert.ToByte('\0');
+		string ret =System.Text.Encoding.Default.GetString(val);
+		return ret;
+	}
+
 }
