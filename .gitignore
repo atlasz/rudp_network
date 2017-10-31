@@ -1,9 +1,9 @@
-/JiangHu/[Ll]ibrary/
-/JiangHu/[Tt]emp/
-/JiangHu/[Oo]bj/
-/JiangHu/[Bb]uild/
-/JiangHu/[Bb]uilds/
-/JiangHu/Assets/AssetStoreTools*
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/AssetStoreTools*
 
 # Visual Studio 2015 cache directory
 /.vs/
