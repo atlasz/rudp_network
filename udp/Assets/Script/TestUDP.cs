@@ -62,7 +62,7 @@ public class TestUDP : MonoBehaviour {
 	{
 		//EndianTest();
 		//SignTest();
-		//BitPackerTest();
+		BitPackerTest();
 		TestStream();
 		//EchoTest();
 	}
