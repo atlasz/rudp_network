@@ -1,5 +1,8 @@
 #pragma once
 
+class Packet;
+class Address;
+
 class NetworkInterface
 {
 public:

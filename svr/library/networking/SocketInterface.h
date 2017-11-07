@@ -1,85 +1,100 @@
-// #pragma once
+#pragma once
 
-// enum SocketInterfaceCounter
-// {
-//     SOCKET_INTERFACE_COUNTER_PACKETS_SENT,
-//     SOCKET_INTERFACE_COUNTER_PACKETS_RECEIVED,
-//     SOCKET_INTERFACE_COUNTER_PACKETS_READ,
-//     SOCKET_INTERFACE_COUNTER_PACKETS_WRITTEN,
-//     SOCKET_INTERFACE_COUNTER_SEND_QUEUE_OVERFLOW,
-//     SOCKET_INTERFACE_COUNTER_RECEIVE_QUEUE_OVERFLOW,
-//     SOCKET_INTERFACE_COUNTER_READ_PACKET_FAILURES,
-//     SOCKET_INTERFACE_COUNTER_WRITE_PACKET_FAILURES,
-//     SOCKET_INTERFACE_COUNTER_ENCRYPT_PACKET_FAILURES,
-//     SOCKET_INTERFACE_COUNTER_DECRYPT_PACKET_FAILURES,
-//     SOCKET_INTERFACE_COUNTER_ENCRYPTED_PACKETS_READ,
-//     SOCKET_INTERFACE_COUNTER_ENCRYPTED_PACKETS_WRITTEN,
-//     SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_READ,
-//     SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_WRITTEN,
-//     SOCKET_INTERFACE_COUNTER_ENCRYPTION_MAPPING_FAILURES,
-//     SOCKET_INTERFACE_COUNTER_NUM_COUNTERS
-// };
+#include <stdint.h>
+#include <assert.h>
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <queue> 
 
-// class SocketInterface : public NetworkInterface
-// {
-//     void * m_context;
+#include <PacketProcessor.h>
+#include <Socket.h>
+#include <PacketFactory.h>
+#include <NetworkInterface.h>
 
-//     uint32_t m_protocolId;
-//     int m_sendQueueSize;
-//     int m_receiveQueueSize;
+class Packet;
+class Address;
 
-//     Socket * m_socket;
-//     // PacketFactory * m_packetFactory;
-//     // PacketProcessor * m_packetProcessor;
+enum SocketInterfaceCounter
+{
+    SOCKET_INTERFACE_COUNTER_PACKETS_SENT,
+    SOCKET_INTERFACE_COUNTER_PACKETS_RECEIVED,
+    SOCKET_INTERFACE_COUNTER_PACKETS_READ,
+    SOCKET_INTERFACE_COUNTER_PACKETS_WRITTEN,
+    SOCKET_INTERFACE_COUNTER_SEND_QUEUE_OVERFLOW,
+    SOCKET_INTERFACE_COUNTER_RECEIVE_QUEUE_OVERFLOW,
+    SOCKET_INTERFACE_COUNTER_READ_PACKET_FAILURES,
+    SOCKET_INTERFACE_COUNTER_WRITE_PACKET_FAILURES,
+    SOCKET_INTERFACE_COUNTER_ENCRYPT_PACKET_FAILURES,
+    SOCKET_INTERFACE_COUNTER_DECRYPT_PACKET_FAILURES,
+    SOCKET_INTERFACE_COUNTER_ENCRYPTED_PACKETS_READ,
+    SOCKET_INTERFACE_COUNTER_ENCRYPTED_PACKETS_WRITTEN,
+    SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_READ,
+    SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_WRITTEN,
+    SOCKET_INTERFACE_COUNTER_ENCRYPTION_MAPPING_FAILURES,
+    SOCKET_INTERFACE_COUNTER_NUM_COUNTERS
+};
 
-//     struct PacketEntry
-//     {
-//         uint64_t sequence;
-//         Address address;
-//         Packet * packet;
-//     };
+class SocketInterface : public NetworkInterface
+{
+    void * m_context;
 
-//     Queue<PacketEntry> m_sendQueue;
-//     Queue<PacketEntry> m_receiveQueue;
+    uint32_t m_protocolId;
+    int m_sendQueueSize;
+    int m_receiveQueueSize;
 
-//     uint64_t m_counters[SOCKET_INTERFACE_COUNTER_NUM_COUNTERS];
+    Socket * m_socket;
+    PacketProcessor * m_packetProcessor;
 
-// protected:
+    struct PacketEntry
+    {
+        uint64_t sequence;
+        Address address;
+        Packet * packet;
+    };
 
-//     void ClearSendQueue();
+    std::queue<PacketEntry> m_sendQueue;
+    std::queue<PacketEntry> m_receiveQueue;
 
-//     void ClearReceiveQueue();
+    uint64_t m_counters[SOCKET_INTERFACE_COUNTER_NUM_COUNTERS];
 
-// public:
+protected:
 
-//     SocketInterface( uint32_t protocolId,
-//                      uint16_t socketPort, 
-//                      SocketType socketType = SOCKET_TYPE_IPV6, 
-//                      int maxPacketSize = 4 * 1024,
-//                      int sendQueueSize = 1024,
-//                      int receiveQueueSize = 1024 );
+    void ClearSendQueue();
 
-//     ~SocketInterface();
+    void ClearReceiveQueue();
 
-//     bool IsError() const;
+public:
 
-//     int GetError() const;
+    SocketInterface( uint32_t protocolId,
+                     uint16_t socketPort, 
+                     SocketType socketType = SOCKET_TYPE_IPV6, 
+                     int maxPacketSize = 4 * 1024,
+                     int sendQueueSize = 1024,
+                     int receiveQueueSize = 1024 );
 
-//     Packet * CreatePacket( int type );
+    ~SocketInterface();
 
-//     void DestroyPacket( Packet * packet );
+    bool IsError() const;
 
-//     void SendPacket( const Address & address, Packet * packet, uint64_t sequence = 0 );
+    int GetError() const;
 
-//     Packet * ReceivePacket( Address & from, uint64_t * sequence = NULL );
+    Packet * CreatePacket( int type );
 
-//     void WritePackets( double time );
+    void DestroyPacket( Packet * packet );
 
-//     void ReadPackets( double time );
+    void SendPacket( const Address & address, Packet * packet, uint64_t sequence = 0 );
 
-//     int GetMaxPacketSize() const;
+    Packet * ReceivePacket( Address & from, uint64_t * sequence = NULL );
 
-//     void SetContext( void * context );
+    void WritePackets( double time );
 
-//     uint64_t GetCounter( int index ) const;
-// };
+    void ReadPackets( double time );
+
+    int GetMaxPacketSize() const;
+
+    void SetContext( void * context );
+
+    uint64_t GetCounter( int index ) const;
+};

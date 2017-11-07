@@ -1,298 +1,282 @@
+#include "SocketInterface.h"
+#include <stdint.h>
+#include <inttypes.h>
 
-// #include <stdint.h>
-// #include <inttypes.h>
+SocketInterface::SocketInterface( uint32_t protocolId,
+                                  uint16_t socketPort, 
+                                  SocketType socketType, 
+                                  int maxPacketSize, 
+                                  int sendQueueSize, 
+                                  int receiveQueueSize )
+{
+    assert( protocolId != 0 );
+    assert( sendQueueSize > 0 );
+    assert( receiveQueueSize > 0 );
 
-// SocketInterface::SocketInterface( uint32_t protocolId,
-//                                   uint16_t socketPort, 
-//                                   SocketType socketType, 
-//                                   int maxPacketSize, 
-//                                   int sendQueueSize, 
-//                                   int receiveQueueSize )
-//     : m_sendQueue( allocator ),
-//       m_receiveQueue( allocator )
-// {
-//     assert( protocolId != 0 );
-//     assert( sendQueueSize > 0 );
-//     assert( receiveQueueSize > 0 );
-
-//     m_context = NULL;
-
-//     m_allocator = &allocator;
+    m_context = NULL;
     
-//     m_socket = new Socket(socketPort, socketType );
+    m_socket = new Socket(socketPort, socketType );
     
-//     m_protocolId = protocolId;
+    m_protocolId = protocolId;
 
-//     m_sendQueueSize = sendQueueSize;
+    m_sendQueueSize = sendQueueSize;
 
-//     m_receiveQueueSize = receiveQueueSize;
-
-//     m_packetFactory = &packetFactory;
+    m_receiveQueueSize = receiveQueueSize;
     
-//     m_packetProcessor = new PacketProcessor( packetFactory, m_protocolId, maxPacketSize );
+    m_packetProcessor = new PacketProcessor(m_protocolId, maxPacketSize, m_context);
     
-//     queue_reserve( m_sendQueue, sendQueueSize );
-//     queue_reserve( m_receiveQueue, receiveQueueSize );
-
-//     const int numPacketTypes = m_packetFactory->GetNumPacketTypes();
-
-//     assert( numPacketTypes > 0 );
-
-//     memset( m_counters, 0, sizeof( m_counters ) );
-// }
-
-// SocketInterface::~SocketInterface()
-// {
-//     assert( m_socket );
-
-//     ClearSendQueue();
-//     ClearReceiveQueue();
-
-//     delete m_socket;
-
-//     m_socket = NULL;
-
-//     m_packetProcessor = NULL;
-// }
-
-// void SocketInterface::ClearSendQueue()
-// {
-//     for ( int i = 0; i < (int) queue_size( m_sendQueue ); ++i )
-//     {
-//         PacketEntry & entry = m_sendQueue[i];
-//         assert( entry.packet );
-//         assert( entry.address.IsValid() );
-//         m_packetFactory->DestroyPacket( entry.packet );
-//     }
-
-//     queue_clear( m_sendQueue );
-// }
-
-// void SocketInterface::ClearReceiveQueue()
-// {
-//     for ( int i = 0; i < (int) queue_size( m_receiveQueue ); ++i )
-//     {
-//         PacketEntry & entry = m_receiveQueue[i];
-//         assert( entry.packet );
-//         assert( entry.address.IsValid() );
-//         m_packetFactory->DestroyPacket( entry.packet );
-//     }
+    // queue_reserve( m_sendQueue, sendQueueSize );
+    // queue_reserve( m_receiveQueue, receiveQueueSize );
+
+    const int numPacketTypes = PacketFactorySingleton::get_mutable_instance().GetNumPacketTypes();
+
+    assert( numPacketTypes > 0 );
+
+    memset( m_counters, 0, sizeof( m_counters ) );
+}
+
+SocketInterface::~SocketInterface()
+{
+    assert( m_socket );
+
+    ClearSendQueue();
+    ClearReceiveQueue();
+
+    delete m_socket;
+
+    m_socket = NULL;
+
+    m_packetProcessor = NULL;
+}
+
+void SocketInterface::ClearSendQueue()
+{
+    // for ( int i = 0; i < (int) queue_size( m_sendQueue ); ++i )
+    // {
+    //     PacketEntry & entry = m_sendQueue[i];
+    //     assert( entry.packet );
+    //     assert( entry.address.IsValid() );
+    //     m_packetFactory->DestroyPacket( entry.packet );
+    // }
+
+    // queue_clear( m_sendQueue );
+
+	while (!m_sendQueue.empty())
+	{
+		PacketEntry & entry = m_sendQueue.front();
+		assert( entry.packet );
+        assert( entry.address.IsValid() );
+        PacketFactorySingleton::get_mutable_instance().DestroyPacket( entry.packet );
+		m_sendQueue.pop();
+	}
+}
+
+void SocketInterface::ClearReceiveQueue()
+{
+    // for ( int i = 0; i < (int) queue_size( m_receiveQueue ); ++i )
+    // {
+    //     PacketEntry & entry = m_receiveQueue[i];
+    //     assert( entry.packet );
+    //     assert( entry.address.IsValid() );
+    //     m_packetFactory->DestroyPacket( entry.packet );
+    // }
+
+    // queue_clear( m_receiveQueue );
+	while (!m_receiveQueue.empty())
+	{
+		PacketEntry & entry = m_receiveQueue.front();
+		assert( entry.packet );
+        assert( entry.address.IsValid() );
+        PacketFactorySingleton::get_mutable_instance().DestroyPacket( entry.packet );
+		m_receiveQueue.pop();
+	}
+}
+
+bool SocketInterface::IsError() const
+{
+    assert( m_socket );
+    return m_socket->IsError();
+}
+
+int SocketInterface::GetError() const
+{
+    assert( m_socket );
+    return m_socket->GetError();
+}
+
+Packet * SocketInterface::CreatePacket( int type )
+{
+    return PacketFactorySingleton::get_mutable_instance().CreatePacket( type );
+}
+
+void SocketInterface::DestroyPacket( Packet * packet )
+{
+    PacketFactorySingleton::get_mutable_instance().DestroyPacket( packet );
+}
+
+void SocketInterface::SendPacket( const Address & address, Packet * packet, uint64_t sequence )
+{
+    assert( packet );
+    assert( address.IsValid() );
+
+    if ( IsError() )
+    {
+        PacketFactorySingleton::get_mutable_instance().DestroyPacket( packet );
+        return;
+    }
+
+    PacketEntry entry;
+    entry.sequence = sequence;
+    entry.address = address;
+    entry.packet = packet;
 
-//     queue_clear( m_receiveQueue );
-// }
+    if ( m_sendQueue.size() >= (size_t)m_sendQueueSize )
+    {
+        m_counters[SOCKET_INTERFACE_COUNTER_SEND_QUEUE_OVERFLOW]++;
+        PacketFactorySingleton::get_mutable_instance().DestroyPacket( packet );
+        return;
+    }
 
-// bool SocketInterface::IsError() const
-// {
-//     assert( m_socket );
-//     return m_socket->IsError();
-// }
+    m_sendQueue.push(entry);
 
-// int SocketInterface::GetError() const
-// {
-//     assert( m_socket );
-//     return m_socket->GetError();
-// }
+    m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_SENT]++;
+}
 
-// Packet * SocketInterface::CreatePacket( int type )
-// {
-//     assert( m_packetFactory );
-//     return m_packetFactory->CreatePacket( type );
-// }
+Packet * SocketInterface::ReceivePacket( Address & from, uint64_t * /*sequence*/ )
+{
+    if ( IsError() )
+        return NULL;
 
-// void SocketInterface::DestroyPacket( Packet * packet )
-// {
-//     assert( m_packetFactory );
-//     m_packetFactory->DestroyPacket( packet );
-// }
+    if ( m_receiveQueue.empty())
+        return NULL;
 
-// void SocketInterface::SendPacket( const Address & address, Packet * packet, uint64_t sequence )
-// {
-//     assert( m_allocator );
-//     assert( m_packetFactory );
+    const PacketEntry & entry = m_receiveQueue.front();
 
-//     assert( packet );
-//     assert( address.IsValid() );
+    m_receiveQueue.pop();
 
-//     if ( IsError() )
-//     {
-//         m_packetFactory->DestroyPacket( packet );
-//         return;
-//     }
+    assert( entry.packet );
+    assert( entry.address.IsValid() );
 
-//     PacketEntry entry;
-//     entry.sequence = sequence;
-//     entry.address = address;
-//     entry.packet = packet;
+    from = entry.address;
 
-//     if ( queue_size( m_sendQueue ) >= (size_t)m_sendQueueSize )
-//     {
-//         m_counters[SOCKET_INTERFACE_COUNTER_SEND_QUEUE_OVERFLOW]++;
-//         m_packetFactory->DestroyPacket( packet );
-//         return;
-//     }
+    m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_RECEIVED]++;
 
-//     queue_push_back( m_sendQueue, entry );
+    return entry.packet;
+}
 
-//     m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_SENT]++;
-// }
+void SocketInterface::WritePackets( double /*time*/ )
+{
+    assert( m_socket );
+    assert( m_packetProcessor );
 
-// Packet * SocketInterface::ReceivePacket( Address & from, uint64_t * /*sequence*/ )
-// {
-//     assert( m_allocator );
-//     assert( m_packetFactory );
+    while ( !m_sendQueue.empty() )
+    {
+        const PacketEntry & entry = m_sendQueue.front();
 
-//     if ( IsError() )
-//         return NULL;
+        assert( entry.packet );
+        assert( entry.address.IsValid() );
 
-//     if ( queue_size( m_receiveQueue ) == 0 )
-//         return NULL;
+        m_sendQueue.pop();
 
-//     const PacketEntry & entry = m_receiveQueue[0];
+        int packetBytes;
 
-//     queue_consume( m_receiveQueue, 1 );
+        const uint8_t * packetData = m_packetProcessor->WritePacket( entry.packet, entry.sequence, packetBytes);
 
-//     assert( entry.packet );
-//     assert( entry.address.IsValid() );
+        if ( !packetData )
+        {
+            switch ( m_packetProcessor->GetError() )
+            {
+                case PACKET_PROCESSOR_ERROR_KEY_IS_NULL:                m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPTION_MAPPING_FAILURES]++;         break;
+                case PACKET_PROCESSOR_ERROR_ENCRYPT_FAILED:             m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPT_PACKET_FAILURES]++;             break;
+                case PACKET_PROCESSOR_ERROR_WRITE_PACKET_FAILED:        m_counters[SOCKET_INTERFACE_COUNTER_WRITE_PACKET_FAILURES]++;               break;
 
-//     from = entry.address;
+                default:
+                    break;
+            }
 
-//     m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_RECEIVED]++;
+            continue;
+        }
 
-//     return entry.packet;
-// }
+        m_socket->SendPacket( entry.address, packetData, packetBytes );
 
-// void SocketInterface::WritePackets( double /*time*/ )
-// {
-//     assert( m_allocator );
-//     assert( m_socket );
-//     assert( m_packetFactory );
-//     assert( m_packetProcessor );
+        PacketFactorySingleton::get_mutable_instance().DestroyPacket( entry.packet );
 
-//     while ( queue_size( m_sendQueue ) )
-//     {
-//         const PacketEntry & entry = m_sendQueue[0];
+        m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_WRITTEN]++;
 
-//         assert( entry.packet );
-//         assert( entry.address.IsValid() );
+        m_counters[SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_WRITTEN]++;
+    }
+}
 
-//         queue_consume( m_sendQueue, 1 );
+void SocketInterface::ReadPackets( double /*time*/ )
+{
+    assert( m_socket );
+    assert( m_packetProcessor );
 
-//         int packetBytes;
+    const int maxPacketSize = GetMaxPacketSize();
 
-//         const bool encrypt = IsEncryptedPacketType( entry.packet->GetType() );
+    uint8_t * packetBuffer = (uint8_t*) alloca( maxPacketSize );
 
-//         const uint8_t * key = NULL;
+    while ( true )
+    {
+        Address address;
+        int packetBytes = m_socket->ReceivePacket( address, packetBuffer, maxPacketSize );
+        if ( !packetBytes )
+            break;
 
-//         const uint8_t * packetData = m_packetProcessor->WritePacket( entry.packet, entry.sequence, packetBytes, encrypt, key );
+        assert( packetBytes > 0 );
 
-//         if ( !packetData )
-//         {
-//             switch ( m_packetProcessor->GetError() )
-//             {
-//                 case PACKET_PROCESSOR_ERROR_KEY_IS_NULL:                m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPTION_MAPPING_FAILURES]++;         break;
-//                 case PACKET_PROCESSOR_ERROR_ENCRYPT_FAILED:             m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPT_PACKET_FAILURES]++;             break;
-//                 case PACKET_PROCESSOR_ERROR_WRITE_PACKET_FAILED:        m_counters[SOCKET_INTERFACE_COUNTER_WRITE_PACKET_FAILURES]++;               break;
+        if ( m_receiveQueue.size() == (size_t) m_receiveQueueSize )
+        {
+            m_counters[SOCKET_INTERFACE_COUNTER_RECEIVE_QUEUE_OVERFLOW]++;
+            break;
+        }
 
-//                 default:
-//                     break;
-//             }
+        uint64_t sequence;
 
-//             continue;
-//         }
+        Packet * packet = m_packetProcessor->ReadPacket( packetBuffer, sequence, packetBytes );
 
-//         m_socket->SendPacket( entry.address, packetData, packetBytes );
+        if ( !packet )
+        {
+            switch ( m_packetProcessor->GetError() )
+            {
+                case PACKET_PROCESSOR_ERROR_KEY_IS_NULL:                m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPTION_MAPPING_FAILURES]++;        break;
+                case PACKET_PROCESSOR_ERROR_DECRYPT_FAILED:             m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPT_PACKET_FAILURES]++;            break;
+                case PACKET_PROCESSOR_ERROR_PACKET_TOO_SMALL:           m_counters[SOCKET_INTERFACE_COUNTER_DECRYPT_PACKET_FAILURES]++;            break;
+                case PACKET_PROCESSOR_ERROR_READ_PACKET_FAILED:         m_counters[SOCKET_INTERFACE_COUNTER_READ_PACKET_FAILURES]++;               break;
 
-//         m_packetFactory->DestroyPacket( entry.packet );
+                default:
+                    break;
+            }
 
-//         m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_WRITTEN]++;
+            continue;
+        }
 
-//         m_counters[SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_WRITTEN]++;
-//     }
-// }
+        PacketEntry entry;
+        entry.sequence = 0;
+        entry.packet = packet;
+        entry.address = address;
 
-// void SocketInterface::ReadPackets( double /*time*/ )
-// {
-//     assert( m_allocator );
-//     assert( m_socket );
-//     assert( m_packetFactory );
-//     assert( m_packetProcessor );
+        m_receiveQueue.push( entry );
 
-//     const int maxPacketSize = GetMaxPacketSize();
+        m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_READ]++;
 
-//     uint8_t * packetBuffer = (uint8_t*) alloca( maxPacketSize );
+        m_counters[SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_READ]++;
+    }
+}
 
-//     while ( true )
-//     {
-//         Address address;
-//         int packetBytes = m_socket->ReceivePacket( address, packetBuffer, maxPacketSize );
-//         if ( !packetBytes )
-//             break;
+int SocketInterface::GetMaxPacketSize() const 
+{
+    return m_packetProcessor->GetMaxPacketSize();
+}
 
-//         assert( packetBytes > 0 );
+void SocketInterface::SetContext( void * context )
+{
+    m_context = context;
+}
 
-//         if ( queue_size( m_receiveQueue ) == (size_t) m_receiveQueueSize )
-//         {
-//             m_counters[SOCKET_INTERFACE_COUNTER_RECEIVE_QUEUE_OVERFLOW]++;
-//             break;
-//         }
-
-//         uint64_t sequence;
-
-//         const uint8_t * key = NULL;
-
-//         EncryptionMapping * encryptionMapping = FindEncryptionMapping( address );
-//         if ( encryptionMapping )
-//             key = encryptionMapping->receiveKey;
-
-//         bool encrypted = false;
-
-//         Packet * packet = m_packetProcessor->ReadPacket( packetBuffer, sequence, packetBytes, encrypted, key, m_packetTypeIsEncrypted, m_packetTypeIsUnencrypted );
-
-//         if ( !packet )
-//         {
-//             switch ( m_packetProcessor->GetError() )
-//             {
-//                 case PACKET_PROCESSOR_ERROR_KEY_IS_NULL:                m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPTION_MAPPING_FAILURES]++;        break;
-//                 case PACKET_PROCESSOR_ERROR_DECRYPT_FAILED:             m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPT_PACKET_FAILURES]++;            break;
-//                 case PACKET_PROCESSOR_ERROR_PACKET_TOO_SMALL:           m_counters[SOCKET_INTERFACE_COUNTER_DECRYPT_PACKET_FAILURES]++;            break;
-//                 case PACKET_PROCESSOR_ERROR_READ_PACKET_FAILED:         m_counters[SOCKET_INTERFACE_COUNTER_READ_PACKET_FAILURES]++;               break;
-
-//                 default:
-//                     break;
-//             }
-
-//             continue;
-//         }
-
-//         PacketEntry entry;
-//         entry.sequence = 0;
-//         entry.packet = packet;
-//         entry.address = address;
-
-//         queue_push_back( m_receiveQueue, entry );
-
-//         m_counters[SOCKET_INTERFACE_COUNTER_PACKETS_READ]++;
-
-//         if ( encrypted )
-//             m_counters[SOCKET_INTERFACE_COUNTER_ENCRYPTED_PACKETS_READ]++;
-//         else
-//             m_counters[SOCKET_INTERFACE_COUNTER_UNENCRYPTED_PACKETS_READ]++;
-//     }
-// }
-
-// int SocketInterface::GetMaxPacketSize() const 
-// {
-//     return m_packetProcessor->GetMaxPacketSize();
-// }
-
-// void SocketInterface::SetContext( void * context )
-// {
-//     m_context = context;
-// }
-
-// uint64_t SocketInterface::GetCounter( int index ) const
-// {
-//     assert( index >= 0 );
-//     assert( index < SOCKET_INTERFACE_COUNTER_NUM_COUNTERS );
-//     return m_counters[index];
-// }
+uint64_t SocketInterface::GetCounter( int index ) const
+{
+    assert( index >= 0 );
+    assert( index < SOCKET_INTERFACE_COUNTER_NUM_COUNTERS );
+    return m_counters[index];
+}

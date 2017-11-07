@@ -11,6 +11,8 @@ Packet* PacketFactory::CreatePacket( int type )
     switch ( type )
     {
         case TEST_PACKET_A: return new TestPacketA();
+        case TEST_PACKET_B: return new TestPacketB();
+        case TEST_PACKET_C: return new TestPacketC();
     }
     return NULL;
 }
