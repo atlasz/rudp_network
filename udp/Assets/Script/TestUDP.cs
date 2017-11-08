@@ -26,36 +26,42 @@ public class TestUDP : MonoBehaviour {
 
 		Debug.Log(string.Format("This is a Client, host name is {0}", Dns.GetHostName()));
 
-		//设置服务IP，设置TCP端口号
-		IPEndPoint ipep = new IPEndPoint(IPAddress .Parse ("127.0.0.1") , 8888);
+		NetSocket socket = new NetSocket(NetSocketType.SOCKET_TYPE_IPV4);
 
-		//定义网络类型，数据连接类型和网络协议UDP
-		Socket server = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+		/**************sending***********/
+		int BufferSize = 1024;
 
-		string welcome = "Hello! ";
-		data = Encoding.ASCII.GetBytes(welcome);
-		server.SendTo(data, data.Length, SocketFlags.None, ipep);
-		IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-		EndPoint Remote = (EndPoint)sender;
+		byte[] buffer = new byte[BufferSize];
 
-		data = new byte[1024];
-		//对于不存在的IP地址，加入此行代码后，可以在指定时间内解除阻塞模式限制
-		//server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 100);
-		int recv = server.ReceiveFrom(data, ref Remote);
-		Console.WriteLine("Message received from {0}: ", Remote.ToString());
-		Console.WriteLine(Encoding .ASCII .GetString (data,0,recv));
+		WriteStream writeSteam = new WriteStream(buffer, BufferSize);
+		TestObject obj = new TestObject();
+		obj.Init();
 
-		//todo
-		input = "hello world";
-		server .SendTo (Encoding .ASCII .GetBytes (input ),Remote );
+		Debug.Log("----write object: " + obj.ToString());
+		obj.SerializeWrite(writeSteam);
+		writeSteam.Flush();
+
+		int bytesWritten = writeSteam.GetBytesProcessed();
+		Debug.Log("bytesWritten: " + bytesWritten);
+
+
+		socket.SendData(writeSteam.GetData(), 0, data.Length);
 		data = new byte [1024];
-		recv = server.ReceiveFrom(data, ref Remote);
-		stringData = Encoding.ASCII.GetString(data, 0, recv);
+		socket.ReceieveData(ref data);
 
-		Debug.LogError(stringData);
+		TestObject readObject = new TestObject();
+
+		byte[] bufferRead = new byte[BufferSize];
+		Array.Copy(data, 0, bufferRead, 0, bytesWritten);
+
+		ReadStream readSteam = new ReadStream(bufferRead, bytesWritten);
+		readObject.SerializeRead(readSteam);
+		Debug.Log("----read object: " + readObject.ToString());
+
+		check(readObject.Equals(obj));
 
 		Debug.Log ("Stopping Client.");
-		server .Close ();            
+		socket.Close ();            
 	}
 
 	private void Test()
@@ -63,8 +69,9 @@ public class TestUDP : MonoBehaviour {
 		//EndianTest();
 		//SignTest();
 		//BitPackerTest();
-		TestStream();
-		//EchoTest();
+		//TestStream();
+		EchoTest();
+		//TestCRC();
 	}
 
 	private void EndianTest()
@@ -164,6 +171,66 @@ public class TestUDP : MonoBehaviour {
 	private void check(bool val)
 	{
 		Assert.IsTrue(val);
+	}
+
+	private void TestCRC()
+	{
+
+		int BufferSize = 1024;
+
+		byte[] buffer = new byte[BufferSize];
+
+		WriteStream writeSteam = new WriteStream(buffer, BufferSize);
+		TestObject obj = new TestObject();
+		obj.Init();
+
+		Debug.Log("----write object: " + obj.ToString());
+		obj.SerializeWrite(writeSteam);
+		writeSteam.Flush();
+
+		int bytesWritten = writeSteam.GetBytesProcessed();
+		Debug.Log("bytesWritten: " + bytesWritten);
+
+//		uint32_t network_protocolId = host_to_network( info.protocolId );
+//		crc32 = calculate_crc32( (uint8_t*) &network_protocolId, 4 );
+//		crc32 = calculate_crc32( buffer + info.prefixBytes, stream.GetBytesProcessed() - info.prefixBytes, crc32 );
+//		*((uint32_t*)(buffer+info.prefixBytes)) = host_to_network( crc32 );
+
+		int id = 2;
+		byte[] arr = BitConverter.GetBytes(id);
+
+		uint readCrc = NetworkCommon.calculate_crc32(arr, 4);
+		Debug.LogError("read 1: " + readCrc);
+		readCrc = NetworkCommon.calculate_crc32(writeSteam.GetData(), bytesWritten, readCrc);
+
+		Debug.LogError("read 2: " + readCrc);
+
+		TestObject readObject = new TestObject();
+
+		byte[] bufferRead = new byte[BufferSize];
+		byte[] serializedBuffer = writeSteam.GetData();
+		Array.Copy(serializedBuffer, 0, bufferRead, 0, bytesWritten);
+
+		ReadStream readSteam = new ReadStream(bufferRead, bytesWritten);
+		readObject.SerializeRead(readSteam);
+		Debug.Log("----read object: " + readObject.ToString());
+
+//		uint32_t network_protocolId = host_to_network( info.protocolId );
+//		uint32_t crc32 = calculate_crc32( (const uint8_t*) &network_protocolId, 4 );
+//		uint32_t zero = 0;
+//		crc32 = calculate_crc32( (const uint8_t*) &zero, 4, crc32 );
+//		crc32 = calculate_crc32( buffer + info.prefixBytes + 4, bufferSize - 4 - info.prefixBytes, crc32 );
+
+		uint crc2 = NetworkCommon.calculate_crc32(arr, 4);
+		Debug.LogError("wrtie 1: " + crc2);
+		byte[] zero = BitConverter.GetBytes(0);
+		crc2 = NetworkCommon.calculate_crc32(zero, 4, crc2);
+		crc2 = NetworkCommon.calculate_crc32(bufferRead, bytesWritten, crc2);
+
+		Debug.LogError("write 2: " + crc2);
+
+		check(readObject.Equals(obj));
+
 	}
 
 	private void TestStream()
