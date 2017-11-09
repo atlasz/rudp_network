@@ -15,10 +15,12 @@ enum TestPacketTypes
     TEST_PACKET_A,
     TEST_PACKET_B,
     TEST_PACKET_C,
-    PACKET_CONNECTION_HEARTBEAT,
-    PACKET_CONNECTION_REQUEST,
-    PACKET_CONNECTION_RESPONSE,
-    PACKET_CONNECTION_DISCONNECT,
+    RUDP_CMD_DATA = 100,
+    RUDP_CMD_CONNECTION_START_REQ = 101,
+    RUDP_CMD_CONNECTION_START_RSP = 102,
+    RUDP_CMD_CONNECTION_STOP_REQ = 103,
+    RUDP_CMD_CONNECTION_STOP_RSP = 104,
+    RUDP_CMD_HEARTBEAT = 105,
     TEST_PACKET_NUM_TYPES
 };
 
@@ -101,38 +103,93 @@ struct TestPacketC : public Packet
     SERIALIZE_FUNCTIONS();
 };
 
-struct ConnectionHeartBeatPacket : public Packet
+struct ConnectionHeartBeat : public Packet
 {
-    ConnectionHeartBeatPacket() : Packet( PACKET_CONNECTION_HEARTBEAT ) {}
+    uint8_t cmd;
+    uint16_t sid;
 
-    template <typename Stream> bool Serialize( Stream & /*stream*/ ) { return true; }
+    ConnectionHeartBeat() : Packet( RUDP_CMD_HEARTBEAT ) {}
+
+    template <typename Stream> bool Serialize( Stream & stream ) 
+    { 
+        serialize_bits(stream, cmd, 8);
+        serialize_bits(stream, sid, 16);
+        return true; 
+    }
 
     SERIALIZE_FUNCTIONS();
 };
 
-struct ProcessConnectionRequest : public Packet
+struct ConnectionStartReq : public Packet
 {
-    ProcessConnectionRequest() : Packet( PACKET_CONNECTION_REQUEST ) {}
+    uint8_t cmd;
+    uint16_t sid;
+    uint64_t uid;
 
-    template <typename Stream> bool Serialize( Stream & /*stream*/ ) { return true; }
+    ConnectionStartReq() : Packet( RUDP_CMD_CONNECTION_START_REQ ) {}
+
+    template <typename Stream> bool Serialize( Stream & stream ) 
+    { 
+        serialize_bits(stream, cmd, 8);
+        serialize_bits(stream, sid, 16);
+        serialize_uint64(stream, uid);
+        return true; 
+    }
 
     SERIALIZE_FUNCTIONS();
 };
 
-struct ProcessConnectionResponse : public Packet
+struct ConnectionStartRsp : public Packet
 {
-    ProcessConnectionResponse() : Packet( PACKET_CONNECTION_RESPONSE ) {}
+    uint8_t cmd;
+    uint16_t sid;
 
-    template <typename Stream> bool Serialize( Stream & /*stream*/ ) { return true; }
+    ConnectionStartRsp() : Packet( RUDP_CMD_CONNECTION_START_RSP ) {}
+
+    template <typename Stream> bool Serialize( Stream & stream ) 
+    { 
+        serialize_bits(stream, cmd, 8);
+        serialize_bits(stream, sid, 16);
+        return true; 
+    }
 
     SERIALIZE_FUNCTIONS();
 };
 
-struct ProcessConnectionDisconnect : public Packet
+struct ConnectionStopReq : public Packet
 {
-    ProcessConnectionDisconnect() : Packet( PACKET_CONNECTION_DISCONNECT ) {}
+    uint8_t cmd;
+    uint16_t sid;
+    uint8_t reason;
 
-    template <typename Stream> bool Serialize( Stream & /*stream*/ ) { return true; }
+    ConnectionStopReq() : Packet( RUDP_CMD_CONNECTION_STOP_REQ ) {}
+
+    template <typename Stream> bool Serialize( Stream & stream ) 
+    { 
+        serialize_bits(stream, cmd, 8);
+        serialize_bits(stream, sid, 16);
+        serialize_bits(stream, reason, 8);
+        return true; 
+    }
+
+    SERIALIZE_FUNCTIONS();
+};
+
+struct ConnectionStopRsp : public Packet
+{
+    uint8_t cmd;
+    uint16_t sid;
+    uint8_t reason;
+
+    ConnectionStopRsp() : Packet( RUDP_CMD_CONNECTION_STOP_RSP ) {}
+
+    template <typename Stream> bool Serialize( Stream & stream ) 
+    { 
+        serialize_bits(stream, cmd, 8);
+        serialize_bits(stream, sid, 16);
+        serialize_bits(stream, reason, 8);
+        return true; 
+    }
 
     SERIALIZE_FUNCTIONS();
 };

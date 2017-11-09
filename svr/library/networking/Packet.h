@@ -36,3 +36,16 @@ struct PacketInfo
         context = NULL;
     }
 };
+
+/*
+/PacketHead
+*/
+struct PacketHead
+{
+    uint8_t chid;
+    uint32_t seq;
+    uint16_t st;
+    uint8_t fragment_count;
+    uint8_t fragment_idx;
+    uint16_t length;
+};

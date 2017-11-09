@@ -8,7 +8,9 @@ using System.Text;
 using UnityEngine.Assertions;
 
 public class TestUDP : MonoBehaviour {
-
+	int BufferSize = 1024;
+	int bytesWritten;
+	ConnectionStartReq startReq;
 	// Use this for initialization
 	void Start () {
 		Test();
@@ -19,49 +21,61 @@ public class TestUDP : MonoBehaviour {
 		
 	}
 
+	private NetSocket socket;
 	private void EchoTest()
 	{
 		byte[] data = new byte[1024];
-		string input ,stringData;
 
 		Debug.Log(string.Format("This is a Client, host name is {0}", Dns.GetHostName()));
 
-		NetSocket socket = new NetSocket(NetSocketType.SOCKET_TYPE_IPV4);
+		socket = new NetSocket(NetSocketType.SOCKET_TYPE_IPV4);
+		socket.AddReceiveProcessor(HanldeMsg);
 
 		/**************sending***********/
-		int BufferSize = 1024;
 
 		byte[] buffer = new byte[BufferSize];
 
 		WriteStream writeSteam = new WriteStream(buffer, BufferSize);
-		TestObject obj = new TestObject();
-		obj.Init();
+		startReq = new ConnectionStartReq();
+		startReq.cmd = (byte)GameCMD.RUDP_CMD_CONNECTION_START_REQ;
+		startReq.sid = 0;
+		startReq.uid = 1;
 
-		Debug.Log("----write object: " + obj.ToString());
-		obj.SerializeWrite(writeSteam);
+		Debug.Log("----write startReq: " + startReq.ToString());
+		startReq.SerializeWrite(writeSteam);
 		writeSteam.Flush();
 
-		int bytesWritten = writeSteam.GetBytesProcessed();
+		bytesWritten = writeSteam.GetBytesProcessed();
 		Debug.Log("bytesWritten: " + bytesWritten);
 
 
 		socket.SendData(writeSteam.GetData(), 0, data.Length);
-		data = new byte [1024];
-		socket.ReceieveData(ref data);
 
-		TestObject readObject = new TestObject();
 
-		byte[] bufferRead = new byte[BufferSize];
-		Array.Copy(data, 0, bufferRead, 0, bytesWritten);
-
-		ReadStream readSteam = new ReadStream(bufferRead, bytesWritten);
-		readObject.SerializeRead(readSteam);
-		Debug.Log("----read object: " + readObject.ToString());
-
-		check(readObject.Equals(obj));
 
 		Debug.Log ("Stopping Client.");
-		socket.Close ();            
+	            
+	}
+
+	private void HanldeMsg(byte[] data)
+	{
+//		TestObject readObject = new TestObject();
+//
+//		byte[] bufferRead = new byte[BufferSize];
+//		Array.Copy(data, 0, bufferRead, 0, bytesWritten);
+//
+//		ReadStream readSteam = new ReadStream(bufferRead, bytesWritten);
+//		readObject.SerializeRead(readSteam);
+
+		ConnectionStartRsp readObject = new ConnectionStartRsp();
+
+		byte[] bufferRead = new byte[BufferSize];
+		Array.Copy(data, 0, bufferRead, 0, BufferSize);
+
+		ReadStream readSteam = new ReadStream(bufferRead, BufferSize);
+				readObject.SerializeRead(readSteam);
+		Debug.Log("----read object: " + readObject.ToString());
+		socket.Close ();
 	}
 
 	private void Test()

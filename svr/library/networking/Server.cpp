@@ -1,87 +1,117 @@
 #include "Server.h"
+#include <logging.h>
 
-Server::Server(NetworkInterface & networkInterface)
+Server::Server()
 {
-	m_networkInterface = &networkInterface;
-	m_numConnectedClients = 0;
-	for ( int i = 0; i < MaxClients; ++i )
-	{
-		ResetClientState( i );
-	}
+	m_svrSocket = new Socket(8888, SOCKET_TYPE_IPV4);
 }
 
 Server::~Server()
 {
-
+   delete m_svrSocket;
 }
 
-void Server::ResetClientState( int clientIndex )
+// void Server::SendPackets( double time )
+// {
+
+// }
+
+int Server::ReceivePackets()
 {
-    assert( clientIndex >= 0 );
-    assert( clientIndex < MaxClients );
-    m_clientConnected[clientIndex] = false;
-    m_clientId[clientIndex] = 0;
-    m_clientAddress[clientIndex] = Address();
-    m_clientData[clientIndex] = ServerClientData();
-}
+	uint8_t msg[kMaxPkgLength];
 
-void Server::SendPackets( double time )
-{
-    for ( int i = 0; i < MaxClients; ++i )
-    {
-        if ( !m_clientConnected[i] )
-            continue;
-
-        if ( m_clientData[i].lastPacketSendTime + ConnectionHeartBeatRate > time )
-            return;
-
-        ConnectionHeartBeatPacket * packet = (ConnectionHeartBeatPacket*) m_networkInterface->CreatePacket( PACKET_CONNECTION_HEARTBEAT );
-
-        SendPacketToConnectedClient( i, packet, time );
-    }
-}
-
-void Server::ReceivePackets( double time )
-{
-    while ( true )
-    {
-        Address address;
-        Packet *packet = m_networkInterface->ReceivePacket( address );
-        if ( !packet )
-            break;
-        
-        switch ( packet->GetType() )
+    while (true) {
+        bool busy = false;
+        Address from;
+        int n = m_svrSocket->ReceivePacket(from, msg, sizeof(msg));
+        if(n > 0)
         {
-            case PACKET_CONNECTION_REQUEST:
-               // ProcessConnectionRequest( *(ConnectionRequestPacket*)packet, address, time );
-                break;
+    		 busy = true;
 
-            case PACKET_CONNECTION_RESPONSE:
-                //ProcessConnectionResponse( *(ConnectionResponsePacket*)packet, address, time );
-                break;
-
-            case PACKET_CONNECTION_HEARTBEAT:
-               // ProcessConnectionHeartBeat( *(ConnectionHeartBeatPacket*)packet, address, time );
-                break;
-
-            case PACKET_CONNECTION_DISCONNECT:
-               // ProcessConnectionDisconnect( *(ConnectionDisconnectPacket*)packet, address, time );
-                break;
-
-            default:
-                break;
+            uint8_t cmd = msg[0];
+            DEBUG("client: (%d)|recv: %d|len: %d", from.GetAddress4(), cmd, n);
+            switch (cmd) 
+            {
+                case RUDP_CMD_CONNECTION_START_REQ:
+                    // ProcessStart(*socket, from, msg, n);
+                	DEBUG("RUDP_CMD_CONNECTION_START_REQ");
+                	ProcessStart(from, msg, n);
+                    break;
+                case RUDP_CMD_CONNECTION_STOP_REQ:
+                    // ProcessStop(*socket, from, msg, n);
+                    break;
+                // case RUDP_CMD_CONN_ACK:
+                //      ProcessConnAck(*socket, from, msg, n);
+                //     break;
+                case RUDP_CMD_HEARTBEAT:
+                    // ProcessHeartbeat(*socket, from, msg, n);
+                    break;
+                case RUDP_CMD_DATA:
+                    // ProcessDataNew(*socket, from, msg, n);
+                    break;
+                default:
+                    ERROR("unknown cmd: %u", cmd);
+                    break;
+            }
         }
 
-        m_networkInterface->DestroyPacket( packet );
+        if (!busy) {
+            break;
+        }
     }
+
+    return 0;
 }
 
-void Server::SendPacketToConnectedClient( int clientIndex, Packet * packet, double time )
+void Server::Tick()
 {
-    assert( packet );
-    assert( clientIndex >= 0 );
-    assert( clientIndex < MaxClients );
-    assert( m_clientConnected[clientIndex] );
-    m_clientData[clientIndex].lastPacketSendTime = time;
-    m_networkInterface->SendPacket( m_clientAddress[clientIndex], packet );
+	ReceivePackets();
+}
+
+void Server::ProcessStart(const Address& from,uint8_t* buffer, int len)
+{
+	ConnectionStartReq startReq;
+    ReadStream readStream( buffer, len );
+    startReq.SerializeRead( readStream );
+
+    DEBUG("ProcessStart: uid %llud sid %d ", startReq.uid, startReq.sid);
+
+    bool need_create = true;
+    auto* s = SessionManagerSingleton::get_mutable_instance().GetSessionByUid(startReq.uid);
+
+    if(nullptr != s)
+    {
+    	//different device
+
+    	//reconnect
+    }
+
+    if(nullptr == s || need_create)
+    {
+    	s = SessionManagerSingleton::get_mutable_instance().ProduceSession(startReq.uid);
+    	if(nullptr == s)
+    	{
+    		ERROR("Produce session failed");
+    	}
+    }
+
+    //set session data
+    s->set_peer(from);
+    s->Start();
+
+    int BufferSize = 512;
+    uint8_t data[BufferSize];
+
+    ConnectionStartRsp rsp;
+    rsp.cmd = RUDP_CMD_CONNECTION_START_RSP;
+    rsp.sid = s->sid();
+
+    WriteStream writeStream( data, BufferSize );
+
+    rsp.SerializeWrite( writeStream );
+ 	writeStream.Flush();
+ 	
+    m_svrSocket->SendPacket(s->peer(), writeStream.GetData(), writeStream.GetBytesProcessed());
+
+   
 }

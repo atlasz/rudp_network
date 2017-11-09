@@ -13,6 +13,11 @@ Packet* PacketFactory::CreatePacket( int type )
         case TEST_PACKET_A: return new TestPacketA();
         case TEST_PACKET_B: return new TestPacketB();
         case TEST_PACKET_C: return new TestPacketC();
+        case RUDP_CMD_CONNECTION_START_REQ: return new ConnectionStartReq();
+        case RUDP_CMD_CONNECTION_START_RSP: return new ConnectionStartRsp();
+        case RUDP_CMD_CONNECTION_STOP_REQ: return new ConnectionStopReq();
+        case RUDP_CMD_CONNECTION_STOP_RSP: return new ConnectionStopRsp();
+        case RUDP_CMD_HEARTBEAT: return new ConnectionHeartBeat();
     }
     return NULL;
 }
