@@ -5,17 +5,18 @@
 #include <BitReader.h>
 #include <BitWriter.h>
 #include <Serialization.h>
+#include <logging.h>
 
 using namespace std;
 /*
 bitpack
 */
-static void CheckHandler( const char * condition, 
+static void checkEqualHandler( const char * condition, 
                           const char * function,
                           const char * file,
                           int line )
 {
-    printf( "check failed: ( %s ), function %s, file %s, line %d\n", condition, function, file, line );
+    printf( "checkEqual failed: ( %s ), function %s, file %s, line %d\n", condition, function, file, line );
 #ifndef NDEBUG
     #if defined( __GNUC__ )
         __builtin_trap();
@@ -26,12 +27,12 @@ static void CheckHandler( const char * condition,
     exit( 1 );
 }
 
-#define check( condition )                                                     \
+#define checkEqual( condition )                                                     \
 do                                                                             \
 {                                                                              \
     if ( !(condition) )                                                        \
     {                                                                          \
-        CheckHandler( #condition, __FUNCTION__, __FILE__, __LINE__ );          \
+        checkEqualHandler( #condition, __FUNCTION__, __FILE__, __LINE__ );          \
     }                                                                          \
 } while(0)
 
@@ -46,11 +47,11 @@ void test_bitpacker()
 
     BitWriter writer( buffer, BufferSize );
 
-    check( writer.GetData() == buffer );
-    check( writer.GetTotalBytes() == BufferSize );
-    check( writer.GetBitsWritten() == 0 );
-    check( writer.GetBytesWritten() == 0 );
-    check( writer.GetBitsAvailable() == BufferSize * 8 );
+    checkEqual( writer.GetData() == buffer );
+    checkEqual( writer.GetTotalBytes() == BufferSize );
+    checkEqual( writer.GetBitsWritten() == 0 );
+    checkEqual( writer.GetBytesWritten() == 0 );
+    checkEqual( writer.GetBitsAvailable() == BufferSize * 8 );
 
     writer.WriteBits( 0, 1 );
     writer.WriteBits( 1, 1 );
@@ -63,21 +64,21 @@ void test_bitpacker()
 
     const int bitsWritten = 1 + 1 + 8 + 8 + 10 + 16 + 32;
 
-    check( writer.GetBytesWritten() == 10 );
-    check( writer.GetTotalBytes() == BufferSize );
-    check( writer.GetBitsWritten() == bitsWritten );
-    check( writer.GetBitsAvailable() == BufferSize * 8 - bitsWritten );
+    checkEqual( writer.GetBytesWritten() == 10 );
+    checkEqual( writer.GetTotalBytes() == BufferSize );
+    checkEqual( writer.GetBitsWritten() == bitsWritten );
+    checkEqual( writer.GetBitsAvailable() == BufferSize * 8 - bitsWritten );
 
     const int bytesWritten = writer.GetBytesWritten();
 
-    check( bytesWritten == 10 );
+    checkEqual( bytesWritten == 10 );
 
     memset( buffer + bytesWritten, 0, BufferSize - bytesWritten );
 
     BitReader reader( buffer, bytesWritten );
 
-    check( reader.GetBitsRead() == 0 );
-    check( reader.GetBitsRemaining() == bytesWritten * 8 );
+    checkEqual( reader.GetBitsRead() == 0 );
+    checkEqual( reader.GetBitsRemaining() == bytesWritten * 8 );
 
     uint32_t a = reader.ReadBits( 1 );
     uint32_t b = reader.ReadBits( 1 );
@@ -87,16 +88,16 @@ void test_bitpacker()
     uint32_t f = reader.ReadBits( 16 );
     uint32_t g = reader.ReadBits( 32 );
 
-    check( a == 0 );
-    check( b == 1 );
-    check( c == 10 );
-    check( d == 255 );
-    check( e == 1000 );
-    check( f == 50000 );
-    check( g == 9999999 );
+    checkEqual( a == 0 );
+    checkEqual( b == 1 );
+    checkEqual( c == 10 );
+    checkEqual( d == 255 );
+    checkEqual( e == 1000 );
+    checkEqual( f == 50000 );
+    checkEqual( g == 9999999 );
 
-    check( reader.GetBitsRead() == bitsWritten );
-    check( reader.GetBitsRemaining() == bytesWritten * 8 - bitsWritten );
+    checkEqual( reader.GetBitsRead() == bitsWritten );
+    checkEqual( reader.GetBitsRemaining() == bytesWritten * 8 - bitsWritten );
 }
 
 /*
@@ -177,7 +178,7 @@ struct TestObject : public Object
 
         serialize_bool( stream, data.g );
 
-        serialize_check( stream, "test object serialize check" );
+        serialize_check( stream, "test object serialize checkEqual" );
 
         serialize_int( stream, data.numItems, 0, MaxItems - 1 );
         for ( int i = 0; i < data.numItems; ++i )
@@ -240,28 +241,20 @@ void test_stream()
     readStream.SetContext( &context );
     readObject.SerializeRead( readStream );
 
-    check( readObject == writeObject );
+    checkEqual( readObject == writeObject );
 }
 
 void test_packets()
 {
     printf( "test packets\n" );
 
-    TestPacketA * a = (TestPacketA*) PacketFactorySingleton::get_mutable_instance().CreatePacket( TEST_PACKET_A );
-    TestPacketB * b = (TestPacketB*) PacketFactorySingleton::get_mutable_instance().CreatePacket( TEST_PACKET_B );
-    TestPacketC * c = (TestPacketC*) PacketFactorySingleton::get_mutable_instance().CreatePacket( TEST_PACKET_C );
+    ConnectionStartReq * a = (ConnectionStartReq*) PacketFactorySingleton::get_mutable_instance().CreatePacket( RUDP_CMD_CONNECTION_START_REQ );
 
-    check( a );
-    check( b );
-    check( c );
+    checkEqual( a );
 
-    check( a->GetType() == TEST_PACKET_A );
-    check( b->GetType() == TEST_PACKET_B );
-    check( c->GetType() == TEST_PACKET_C );
+    checkEqual( a->GetType() == RUDP_CMD_CONNECTION_START_REQ );
 
     PacketFactorySingleton::get_mutable_instance().DestroyPacket( a );
-    PacketFactorySingleton::get_mutable_instance().DestroyPacket( b );
-    PacketFactorySingleton::get_mutable_instance().DestroyPacket( c );
 }
 
 void test_crc()
@@ -280,6 +273,12 @@ void test_crc()
 
 int main()
 {
+    Logger::getLogger().setLogLevel(Logger::LDEBUG);
+
+    ERROR("---a test error msg at %ld", time(NULL));
+
+    DEBUG("---debug at %ld", time(NULL));
+
 	cout << " NOT Debug " << endl;
 
 	#ifdef DEBUG

@@ -35,3 +35,4 @@ add_subdirectory(library/networking)
 
 #add bin subdirectory
 add_subdirectory(service/test)
+add_subdirectory(service/first)
